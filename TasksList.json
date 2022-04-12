@@ -1,0 +1,17 @@
+{
+	"tasks" :
+	[
+		{
+			"exe" : "ls",
+			"args" : "-a",
+			"pwd" : "",
+			"timeout" : "1000"
+		},
+		{
+			"exe" : "uname",
+			"args" : "-r",
+			"pwd" : "",
+			"timeout" : "1000"
+		}
+	]
+}
