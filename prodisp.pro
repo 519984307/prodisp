@@ -1,5 +1,5 @@
 QT += core gui widgets
-CONFIG += c++11
+TARGET = prodisp
 QMAKE_CXXFLAGS += -std=c++11 -fPIC
 
 COMMIT_NUMBER = 1

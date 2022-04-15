@@ -11,9 +11,10 @@ class TaskExecutor : public QObject
 {
     Q_OBJECT
 public:
-    TaskExecutor(QObject *parent = nullptr);
+    TaskExecutor(const QStringList &extra_args = QStringList(), QObject *parent = nullptr);
     ~TaskExecutor();
 
+    static QStringList extra_args() noexcept;
     static QString taskslist_name() noexcept;
     static QString taskslist_path() noexcept;
 
@@ -23,17 +24,22 @@ public slots:
     void restart(bool run);
     void ask_for_info();
     void need_edit_taskslist();
+    void send_signal(const QString &task_name, int sig);
 
     void read_file();
 
 private slots:
 
 private:
+    static TaskExecutor *self;
+
     void complete_quit();
     void parse_file(const QByteArray &data);
 
     QThread *m_tasks_thread = nullptr;
     QList<Task*> m_tasks;
+
+    QStringList m_extra_args;
 
 signals:
     void task_started(const QString &task_name);
@@ -44,6 +50,9 @@ signals:
 
     void info_reply(const QList<TaskInfo> &info);
     void edit_taskslist(const QList<TaskInfo> &info);
+
+    void started();
+    void finished();
 };
 
 #endif // TASKEXECUTOR_H

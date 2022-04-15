@@ -8,6 +8,7 @@
 #include <QSpinBox>
 #include <QLineEdit>
 #include <QSettings>
+#include <QCheckBox>
 #include <QTabWidget>
 #include <QFileDialog>
 #include <QFormLayout>
@@ -71,20 +72,21 @@ void TasksCreator::save_button_clicked()
         return;
     }
 
-    QList<Task*> tasks;
-
+    QList<TaskInfo> tasks;
     for (int i = 0; i < m_task_tabs->count(); ++i)
     {
-        Task *task = new Task;
+        TaskInfo task;
         QWidget *w = m_task_tabs->widget(i);
         if (QLineEdit *l = w->findChild<QLineEdit*>("exe"))
-            task->exe(l->text());
+            task.exe = l->text();
         if (QLineEdit *l = w->findChild<QLineEdit*>("args"))
-            task->args(l->text());
+            task.args = l->text();
         if (QLineEdit *l = w->findChild<QLineEdit*>("pwd"))
-            task->pwd(l->text());
+            task.pwd = l->text();
         if (QSpinBox *s = w->findChild<QSpinBox*>("timeout"))
-            task->timeout(s->value());
+            task.timeout = static_cast<uint64_t>(s->value());
+        if (QCheckBox *c = w->findChild<QCheckBox*>("extra_args"))
+            task.extra_args = c->isChecked();
         tasks.push_back(task);
     }
 
@@ -98,11 +100,6 @@ void TasksCreator::save_button_clicked()
     else
     {
         QMessageBox::warning(this, tr("Ошибка"), tr("Невозможно записать файл"));
-    }
-
-    for (Task *t : tasks)
-    {
-        delete t;
     }
 }
 
@@ -227,7 +224,7 @@ QWidget *TasksCreator::create_tab()
     exe_edit->setObjectName("exe");
     exe_choose->setToolButtonStyle(Qt::ToolButtonIconOnly);
     exe_choose->setIcon(QIcon(":/images/folder.ico"));
-    exe_choose->setToolTip(tr("Выбрать"));
+    exe_choose->setToolTip(tr("Указать путь к исполняемому файлу"));
     exe_hl->addWidget(exe_edit);
     exe_hl->addWidget(exe_choose);
     exe_widget->setLayout(exe_hl);
@@ -248,7 +245,7 @@ QWidget *TasksCreator::create_tab()
     pwd_edit->setObjectName("pwd");
     pwd_choose->setToolButtonStyle(Qt::ToolButtonIconOnly);
     pwd_choose->setIcon(QIcon(":/images/folder.ico"));
-    pwd_choose->setToolTip(tr("Выбрать"));
+    pwd_choose->setToolTip(tr("Указать рабочую директорию"));
     pwd_hl->setSpacing(3);
     pwd_hl->addWidget(pwd_edit);
     pwd_hl->addWidget(pwd_choose);
@@ -256,15 +253,26 @@ QWidget *TasksCreator::create_tab()
     form->addRow(tr("Рабочая директория: "), pwd_widget);
 
     QWidget *timeout_widget = new QWidget;
-    QSpinBox *timeout_spin = new QSpinBox(w);
+    QSpinBox *timeout_spin = new QSpinBox(timeout_widget);
     QHBoxLayout *timeout_hl = new QHBoxLayout;
     timeout_spin->setObjectName("timeout");
+    timeout_spin->setToolTip(tr("Интервал перезапуска задачи при завершении"));
     timeout_spin->setRange(10, 3600 * 1000); // Миллисекунды
     timeout_spin->setValue(1000);
     timeout_spin->setSuffix(tr(" мс"));
     timeout_hl->addWidget(timeout_spin);
     timeout_widget->setLayout(timeout_hl);
     form->addRow(tr("Таймаут: "), timeout_widget);
+
+    QWidget *extra_args_widget = new QWidget;
+    QCheckBox *extra_args_checkbox = new QCheckBox(extra_args_widget);
+    QHBoxLayout *extra_args_hl = new QHBoxLayout;
+    extra_args_checkbox->setObjectName("extra_args");
+    extra_args_checkbox->setToolTip(tr("Признак передачи доп. аргументов"));
+    extra_args_checkbox->setChecked(true);
+    extra_args_hl->addWidget(extra_args_checkbox);
+    extra_args_widget->setLayout(extra_args_hl);
+    form->addRow(tr("Доп. аргументы: "), extra_args_widget);
 
     QObject::connect(exe_edit, &QLineEdit::textChanged, this, std::bind(&TasksCreator::exe_text_changed, this, std::placeholders::_1, m_task_tabs->count()));
     QObject::connect(exe_choose, &QToolButton::clicked, this, std::bind(&TasksCreator::choose_exe_file, this, exe_edit, pwd_edit));
@@ -288,17 +296,19 @@ QWidget *TasksCreator::create_tab(const TaskInfo &info)
         l->setText(info.pwd);
     if (QSpinBox *s = w->findChild<QSpinBox*>("timeout"))
         s->setValue(info.timeout);
+    if (QCheckBox *c = w->findChild<QCheckBox*>("extra_args"))
+        c->setChecked(info.extra_args);
     return w;
 }
 
-QString TasksCreator::create_json(const QList<Task*> &tasks)
+QString TasksCreator::create_json(const QList<TaskInfo> &tasks)
 {
     try
     {
         jsoncons::ojson tasks_array(jsoncons::json_array_arg);
-        for (const Task *t : tasks)
+        for (const TaskInfo &t : tasks)
         {
-            tasks_array.push_back(t->to_json_array_object_ordered());
+            tasks_array.push_back(t.to_json_array_object_ordered());
         }
 
         jsoncons::ojson doc;
@@ -334,7 +344,7 @@ void TasksCreator::restore_settings()
         restoreGeometry(sett.value("taskcreator_geometry").toByteArray());
 }
 
-bool TasksCreator::save_to_file(const QList<Task*> &tasks)
+bool TasksCreator::save_to_file(const QList<TaskInfo> &tasks)
 {
     if (edit_mode)
         return save_editted_file(tasks);
@@ -342,7 +352,7 @@ bool TasksCreator::save_to_file(const QList<Task*> &tasks)
         return save_new_file(tasks);
 }
 
-bool TasksCreator::save_new_file(const QList<Task*> &tasks)
+bool TasksCreator::save_new_file(const QList<TaskInfo> &tasks)
 {
     QFileDialog fd;
     fd.setFileMode(QFileDialog::DirectoryOnly);
@@ -356,25 +366,28 @@ bool TasksCreator::save_new_file(const QList<Task*> &tasks)
         if (!dirs.empty())
         {
             QString dir = dirs.at(0);
-
-            QSettings sett;
-            if (!prodisp::streq(sett.value("path", Application::applicationDirPath()).toString(), dir))
+            if (!dir.isEmpty())
             {
-                if (prodisp::confirm_operation(tr("Вопрос"), tr("Задать выбранную директорию директорией поиска по умолчанию?")))
+                QSettings sett;
+                if (!prodisp::streq(sett.value("path", Application::applicationDirPath()).toString(), dir))
                 {
-                    sett.setValue("path", dir);
+                    if (prodisp::confirm_operation(tr("Вопрос"), tr("Задать выбранную директорию директорией поиска по умолчанию?")))
+                    {
+                        sett.setValue("path", dir);
+                        emit ask_to_restart();
+                    }
                 }
-            }
 
-            QString json = create_json(tasks);
-            if (json.isEmpty())
-            {
-                std::cerr << "save_new_file(): empty json" << std::endl;
-            }
-            else
-            {
-                QString path = QString("%1/%2").arg(dir).arg(TaskExecutor::taskslist_name());
-                return write_to_file(path, json.toLocal8Bit());
+                QString json = create_json(tasks);
+                if (json.isEmpty())
+                {
+                    std::cerr << "save_new_file(): empty json" << std::endl;
+                }
+                else
+                {
+                    QString path = QString("%1/%2").arg(dir).arg(TaskExecutor::taskslist_name());
+                    return write_to_file(path, json.toLocal8Bit());
+                }
             }
         }
     }
@@ -382,15 +395,18 @@ bool TasksCreator::save_new_file(const QList<Task*> &tasks)
     return false;
 }
 
-bool TasksCreator::save_editted_file(const QList<Task *> &tasks)
+bool TasksCreator::save_editted_file(const QList<TaskInfo> &tasks)
 {
     QString path = TaskExecutor::taskslist_path();
     QFileInfo fi(path);
 
-    if (!fi.isWritable())
+    if (fi.exists())
     {
-        std::cerr << "isWritable() == false" << std::endl;
-        return false;
+        if (!fi.isWritable())
+        {
+            std::cerr << "isWritable() == false" << std::endl;
+            return false;
+        }
     }
 
     QString json = create_json(tasks);

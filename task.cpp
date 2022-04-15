@@ -1,4 +1,5 @@
 #include "task.h"
+#include "taskexecutor.h"
 
 #include <iostream>
 
@@ -30,6 +31,11 @@ void Task::start()
 {
     stop();
 
+    QStringList extra_args = TaskExecutor::extra_args();
+    QStringList args = info.args.isEmpty() ? QStringList() : info.args.split(' ');
+    if (!extra_args.empty() && info.extra_args)
+        args += extra_args;
+
     m_timer = new QTimer;
     m_timer->setTimerType(Qt::PreciseTimer);
     m_timer->setSingleShot(true);
@@ -46,16 +52,16 @@ void Task::start()
 #endif
 
     m_process->setWorkingDirectory(info.pwd);
-    m_process->setArguments(info.args.split(' '));
+    m_process->setArguments(args);
     m_process->setProgram(info.exe);
     m_process->start();
 
-#if QT_VERSION < QT_VERSION_CHECK(5, 6, 0)
     if (!m_process->waitForStarted(1000))
     {
+#if QT_VERSION < QT_VERSION_CHECK(5, 6, 0)
         emit task_failed_to_start(name());
-    }
 #endif
+    }
 }
 
 void Task::stop()
@@ -136,19 +142,14 @@ Task *Task::from_json_array_object_ordered(const jsoncons::ojson &array_value)
         return nullptr;
     }
 
-    if (!array_value.contains("exe") || !array_value.contains("args") || !array_value.contains("pwd") || !array_value.contains("timeout"))
-    {
-        std::cerr << "array_value is not valid" << std::endl;
-        return nullptr;
-    }
-
     try
     {
         std::unique_ptr<Task> ptr(new Task);
-        ptr->info.exe = QString::fromStdString(array_value["exe"].as<std::string>());
-        ptr->info.args = QString::fromStdString(array_value["args"].as<std::string>());
-        ptr->info.pwd = QString::fromStdString(array_value["pwd"].as<std::string>());
+        ptr->info.exe = array_value["exe"].as_string_view().data();
+        ptr->info.args = array_value["args"].as_string_view().data();
+        ptr->info.pwd = array_value["pwd"].as_string_view().data();
         ptr->info.timeout = array_value["timeout"].as<uint64_t>();
+        ptr->info.extra_args = array_value["extra_args"].as_bool();
         return ptr.release();
     }
     catch (const std::exception &e)
@@ -165,18 +166,15 @@ Task *Task::from_json_array_object_ordered(const jsoncons::ojson &array_value)
 
 jsoncons::ojson Task::to_json_array_object_ordered() const
 {
-    jsoncons::ojson task_object(jsoncons::json_object_arg,
-    {
-        { "exe", info.exe.toStdString() },
-        { "args", info.args.toStdString() },
-        { "pwd", info.pwd.toStdString() },
-        { "timeout", info.timeout }
-    });
-
-    return task_object;
+    return info.to_json_array_object_ordered();
 }
 
 QString Task::name() const noexcept
 {
     return QFileInfo(info.exe).baseName();
+}
+
+qint64 Task::pid() const noexcept
+{
+    return (m_process ? m_process->processId() : 0);
 }

@@ -68,6 +68,8 @@ friend QDebug operator<<(QDebug debug, const Task &p)
     const uint64_t &timeout() const noexcept { return info.timeout; }
     const uint64_t &timeout(const uint64_t &new_value) noexcept { info.timeout = new_value; return info.timeout; }
 
+    qint64 pid() const noexcept;
+
 public slots:
     void start();
     void stop();
@@ -85,6 +87,7 @@ private slots:
 
 private:
     friend class TaskExecutor;
+
     TaskInfo info;
 
     QProcess *m_process = nullptr;

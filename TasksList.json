@@ -5,13 +5,15 @@
 			"exe" : "ls",
 			"args" : "-a",
 			"pwd" : "",
-			"timeout" : "1000"
+			"timeout" : "1000",
+			"extra_args" : false
 		},
 		{
 			"exe" : "uname",
 			"args" : "-r",
 			"pwd" : "",
-			"timeout" : "1000"
+			"timeout" : "1000",
+			"extra_args" : true
 		}
 	]
 }

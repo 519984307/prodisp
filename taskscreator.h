@@ -38,7 +38,7 @@ private:
     QWidget *create_tab();
     QWidget *create_tab(const TaskInfo &info);
 
-    QString create_json(const QList<Task*> &tasks);
+    QString create_json(const QList<TaskInfo> &tasks);
 
     void save_settings();
     void restore_settings();
@@ -52,12 +52,13 @@ private:
 
     const bool edit_mode;
 
-    bool save_to_file(const QList<Task*> &tasks);
-    bool save_new_file(const QList<Task*> &tasks);
-    bool save_editted_file(const QList<Task*> &tasks);
+    bool save_to_file(const QList<TaskInfo> &tasks);
+    bool save_new_file(const QList<TaskInfo> &tasks);
+    bool save_editted_file(const QList<TaskInfo> &tasks);
     bool write_to_file(const QString &path, const QByteArray &data);
 
 signals:
+    void ask_to_restart();
     void update_taskslist();
 };
 

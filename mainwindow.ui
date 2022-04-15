@@ -53,7 +53,7 @@
   <widget class="QStatusBar" name="statusbar"/>
   <widget class="QToolBar" name="toolbar">
    <property name="windowTitle">
-    <string>toolbar</string>
+    <string>Панель управления</string>
    </property>
    <property name="movable">
     <bool>false</bool>

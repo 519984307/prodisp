@@ -10,6 +10,7 @@
 #include <QTimer>
 #include <QDebug>
 #include <QLabel>
+#include <QTabBar>
 #include <QAction>
 #include <QKeyEvent>
 #include <QSettings>
@@ -21,6 +22,12 @@
 #include <QVBoxLayout>
 #include <QFileDialog>
 #include <QMessageBox>
+#include <QTextDocument>
+#include <QSignalBlocker>
+
+#ifndef _WIN32
+#include <csignal>
+#endif
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
@@ -55,11 +62,20 @@ MainWindow::MainWindow(QWidget *parent)
     ui->file_menu->addAction(m_quit_action);
 
     m_tabs = new QTabWidget(this);
+    m_tabs->tabBar()->setContextMenuPolicy(Qt::CustomContextMenu);
     setCentralWidget(m_tabs);
+
+    QStringList args = TaskExecutor::extra_args();
+    if (!args.empty())
+    {
+        QLabel *args_lbl = new QLabel(tr("<b>Доп. аргументы:</b> %1").arg(TaskExecutor::extra_args().join(' ')), this);
+        statusBar()->addPermanentWidget(args_lbl);
+    }
 
     m_label = new QLabel(this);
     statusBar()->addPermanentWidget(m_label);
 
+    QObject::connect(m_tabs->tabBar(), &QTabBar::customContextMenuRequested, this, &MainWindow::tab_bar_custom_context_menu_requested);
     QObject::connect(this, &MainWindow::need_update_permanent_widget, this, &MainWindow::update_permanent_widget, Qt::QueuedConnection);
     QObject::connect(m_create_taskslist_action, &QAction::triggered, this, &MainWindow::create_taskslist_action_triggered);
     QObject::connect(m_edit_taskslist_action, &QAction::triggered, this, &MainWindow::edit_taskslist_action_triggered);
@@ -119,7 +135,7 @@ void MainWindow::task_finished(const QString &task_name, int exit_code)
             QWidget *w = m_tabs->widget(i);
             if (QTextEdit *out = w->findChild<QTextEdit*>("output"))
             {
-                out->append(QString("<b><font color=\"purple\">%1</font></b>: <b><font color=\"green\">%2</font></b>")
+                out->append(QString("<b><font color=\"dark blue\">%1</font></b>: <b><font color=\"dark blue\">%2</font></b>")
                             .arg(QDateTime::currentDateTime().toString("HH:mm:ss.zzz"))
                             .arg(tr("Процесс завершён с кодом \"%1\"").arg(exit_code)));
             }
@@ -139,7 +155,7 @@ void MainWindow::task_failed_to_start(const QString &task_name)
             QWidget *w = m_tabs->widget(i);
             if (QTextEdit *out = w->findChild<QTextEdit*>("output"))
             {
-                out->append(QString("<b><font color=\"purple\">%1</font></b>: <b><font color=\"green\">%2</font></b>")
+                out->append(QString("<b><font color=\"dark blue\">%1</font></b>: <b><font color=\"dark blue\">%2</font></b>")
                             .arg(QDateTime::currentDateTime().toString("HH:mm:ss.zzz"))
                             .arg(tr("Невозможно запустить процесс")));
             }
@@ -162,7 +178,7 @@ void MainWindow::stdout_msg(const QString &task_name, const QString &msg)
             QWidget *w = m_tabs->widget(i);
             if (QTextEdit *out = w->findChild<QTextEdit*>("output"))
             {
-                out->append(QString("<b><font color=\"purple\">%1</font></b>: %2").arg(QDateTime::currentDateTime().toString("HH:mm:ss.zzz")).arg(msg));
+                out->append(QString("<b><font color=\"dark blue\">%1</font></b>: %2").arg(QDateTime::currentDateTime().toString("HH:mm:ss.zzz")).arg(msg));
             }
         }
     }
@@ -181,7 +197,7 @@ void MainWindow::stderr_msg(const QString &task_name, const QString &msg)
             QWidget *w = m_tabs->widget(i);
             if (QTextEdit *out = w->findChild<QTextEdit*>("output"))
             {
-                out->append(QString("<b><font color=\"purple\">%1</font></b>: <b><font color=\"red\">%2</font></b>").arg(QDateTime::currentDateTime().toString("HH:mm:ss.zzz")).arg(msg));
+                out->append(QString("<b><font color=\"dark blue\">%1</font></b>: <b><font color=\"red\">%2</font></b>").arg(QDateTime::currentDateTime().toString("HH:mm:ss.zzz")).arg(msg));
             }
         }
     }
@@ -190,6 +206,7 @@ void MainWindow::stderr_msg(const QString &task_name, const QString &msg)
 void MainWindow::create_taskslist_action_triggered()
 {
     TasksCreator tc(this);
+    QObject::connect(&tc, &TasksCreator::ask_to_restart, this, &MainWindow::ask_to_restart, Qt::QueuedConnection);
     tc.exec();
 
     emit need_update_permanent_widget();
@@ -203,29 +220,34 @@ void MainWindow::edit_taskslist_action_triggered()
 void MainWindow::edit_taskslist(const QList<TaskInfo> &info)
 {
     TasksCreator tc(info, this);
-    QObject::connect(&tc, &TasksCreator::update_taskslist, this, &MainWindow::update_taskslist);
+    QObject::connect(&tc, &TasksCreator::update_taskslist, this, &MainWindow::update_taskslist, Qt::QueuedConnection);
     tc.exec();
+}
+
+void MainWindow::started()
+{
+    QSignalBlocker lock(m_play_pause_action);
+    configure_ui(true);
+    m_play_pause_action->setChecked(true);
+    statusBar()->showMessage(tr("Задачи запущены..."), 5000);
+}
+
+void MainWindow::finished()
+{
+    QSignalBlocker lock(m_play_pause_action);;
+    configure_ui(false);
+    m_play_pause_action->setChecked(false);
+    statusBar()->showMessage(tr("Задачи остановлены!"), 5000);
 }
 
 void MainWindow::play_pause_toggled(bool state)
 {
-    m_create_taskslist_action->setEnabled(!state);
-    m_edit_taskslist_action->setEnabled(!state);
-    m_choose_path_to_taskslist_action->setEnabled(!state);
-    ui->reread_taskslist_action->setEnabled(!state);
-
     if (state)
     {
-        m_play_pause_action->setText(tr("Остановить"));
-        m_play_pause_action->setIcon(QIcon(":/images/stop.png"));
-
         emit start();
     }
     else
     {
-        m_play_pause_action->setText(tr("Запустить"));
-        m_play_pause_action->setIcon(QIcon(":/images/play.png"));
-
         emit stop();
     }
 }
@@ -252,6 +274,39 @@ void MainWindow::update_taskslist()
 {
     emit restart(false);
     emit ask_for_info();
+}
+
+void MainWindow::tab_bar_custom_context_menu_requested(const QPoint &pos)
+{
+    int index = m_tabs->tabBar()->tabAt(pos);
+    if (index < 0)
+        return;
+
+    QString task_name = m_tabs->tabText(index);
+
+    QMenu menu(this);
+#ifdef _WIN32
+    QAction *kill = menu.addAction(tr("Завершить принудительно (TerminateProcess)"));
+    if (menu.exec(m_tabs->tabBar()->mapToGlobal(pos)) != nullptr)
+        emit send_signal(task_name, 1);
+#else
+    QMenu *send_signal_menu = menu.addMenu(tr("Отправить сигнал"));
+
+    QAction *sigusr1 = send_signal_menu->addAction("SIGUSR1");
+    QAction *sigusr2 = send_signal_menu->addAction("SIGUSR2");
+    QAction *sigint = send_signal_menu->addAction("SIGINT");
+    QAction *sigalrm = send_signal_menu->addAction("SIGALRM");
+
+    QAction *a = menu.exec(m_tabs->tabBar()->mapToGlobal(pos));
+    if (a == sigusr1)
+        emit send_signal(task_name, SIGUSR1);
+    else if (a == sigusr2)
+        emit send_signal(task_name, SIGUSR2);
+    else if (a == sigint)
+        emit send_signal(task_name, SIGINT);
+    else if (a == sigalrm)
+        emit send_signal(task_name, SIGALRM);
+#endif
 }
 
 void MainWindow::choose_path_to_taskslist_action_triggered()
@@ -292,7 +347,7 @@ void MainWindow::restore_settings()
         restoreGeometry(sett.value("geometry").toByteArray());
     }
 
-    if (sett.value("autolaunch").toBool())
+    if (sett.value("autolaunch", true).toBool())
     {
         ui->autolaunch_action->setChecked(true);
         m_play_pause_action->setChecked(true);
@@ -319,10 +374,8 @@ void MainWindow::update_permanent_widget()
     m_label->setText(tr("<b>Путь к \"%1\":</b> \"%2\"").arg(TaskExecutor::taskslist_name()).arg(sett.value("path", Application::applicationDirPath()).toString()));
 }
 
-void MainWindow::info_reply(const QList<TaskInfo> &info)
+void MainWindow::create_tabs(const QList<TaskInfo> &info)
 {
-    m_tabs->clear();
-
     for (const TaskInfo &i : info)
     {
         QWidget *w = new QWidget(m_tabs);
@@ -332,6 +385,7 @@ void MainWindow::info_reply(const QList<TaskInfo> &info)
         output->setObjectName("output");
         box_vl->addWidget(output);
         box->setLayout(box_vl);
+        output->document()->setMaximumBlockCount(1000); // Максимальное количество строк
 
         QFormLayout *f = new QFormLayout;
         f->setRowWrapPolicy(QFormLayout::DontWrapRows);
@@ -351,4 +405,29 @@ void MainWindow::info_reply(const QList<TaskInfo> &info)
 
         m_tabs->addTab(w, QIcon(":/images/red.png"), i.name());
     }
+}
+
+void MainWindow::configure_ui(bool state)
+{
+    m_create_taskslist_action->setEnabled(!state);
+    m_edit_taskslist_action->setEnabled(!state);
+    m_choose_path_to_taskslist_action->setEnabled(!state);
+    ui->reread_taskslist_action->setEnabled(!state);
+
+    if (state)
+    {
+        m_play_pause_action->setText(tr("Остановить"));
+        m_play_pause_action->setIcon(QIcon(":/images/stop.png"));
+    }
+    else
+    {
+        m_play_pause_action->setText(tr("Запустить"));
+        m_play_pause_action->setIcon(QIcon(":/images/play.png"));
+    }
+}
+
+void MainWindow::info_reply(const QList<TaskInfo> &info)
+{
+    m_tabs->clear();
+    create_tabs(info);
 }

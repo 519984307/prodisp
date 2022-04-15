@@ -28,6 +28,9 @@ public slots:
     void info_reply(const QList<TaskInfo> &info);
     void edit_taskslist(const QList<TaskInfo> &info);
 
+    void started();
+    void finished();
+
 private slots:
     void create_taskslist_action_triggered();
     void edit_taskslist_action_triggered();
@@ -37,6 +40,7 @@ private slots:
     void save_output_action_toggled(bool state);
     void quit_action_triggered();
     void update_taskslist();
+    void tab_bar_custom_context_menu_requested(const QPoint &pos);
 
 private:
     void save_settings();
@@ -44,6 +48,9 @@ private:
 
     void ask_to_restart();
     void update_permanent_widget();
+
+    void create_tabs(const QList<TaskInfo> &info);
+    void configure_ui(bool state);
 
     Ui::MainWindow *ui;
     QTabWidget *m_tabs = nullptr;
@@ -63,5 +70,6 @@ signals:
     void ask_for_info();
     void need_update_permanent_widget();
     void need_edit_taskslist();
+    void send_signal(const QString &task_name, int sig);
 };
 #endif // MAINWINDOW_H
