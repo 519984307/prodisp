@@ -24,6 +24,7 @@ struct TaskInfo
     {
         if (this != &other)
         {
+            name = other.name;
             exe = other.exe;
             args = other.args;
             pwd = other.pwd;
@@ -38,6 +39,7 @@ struct TaskInfo
     {
         if (this != &other)
         {
+            name = std::move(other.name);
             exe = std::move(other.exe);
             args = std::move(other.args);
             pwd = std::move(other.pwd);
@@ -51,8 +53,6 @@ struct TaskInfo
         return *this;
     }
 
-    QString name() const noexcept { return QFileInfo(exe).baseName(); }
-
     static TaskInfo from_json_array_object_ordered(const jsoncons::ojson &array_value)
     {
         if (!array_value.is_object())
@@ -64,6 +64,7 @@ struct TaskInfo
         try
         {
             TaskInfo ti;
+            ti.name = array_value["name"].as_string_view().data();
             ti.exe = array_value["exe"].as_string_view().data();
             ti.args = array_value["args"].as_string_view().data();
             ti.pwd = array_value["pwd"].as_string_view().data();
@@ -87,16 +88,18 @@ struct TaskInfo
     {
         jsoncons::ojson task_object(jsoncons::json_object_arg,
         {
-            { "exe", exe.toStdString() },
-            { "args", args.toStdString() },
-            { "pwd", pwd.toStdString() },
-            { "timeout", timeout },
-            { "extra_args", extra_args }
+            { "name",       name.toStdString() },
+            { "exe",        exe.toStdString()  },
+            { "args",       args.toStdString() },
+            { "pwd",        pwd.toStdString()  },
+            { "timeout",    timeout            },
+            { "extra_args", extra_args         }
         });
 
         return task_object;
     }
 
+    QString name; /* Название задачи */
     QString exe; /* Путь к исполняемому файлу */
     QString args; /* Аргументы */
     QString pwd; /* Рабочая директория */

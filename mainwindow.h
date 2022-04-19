@@ -2,10 +2,13 @@
 #define MAINWINDOW_H
 
 #include <QMainWindow>
+#include <QSystemTrayIcon>
 
 class QLabel;
 class QTabWidget;
+
 struct TaskInfo;
+
 namespace Ui { class MainWindow; }
 class MainWindow : public QMainWindow
 {
@@ -13,6 +16,8 @@ class MainWindow : public QMainWindow
 public:
     explicit MainWindow(QWidget *parent = nullptr);
     ~MainWindow();
+
+    void setVisible(bool visible) override;
 
 protected:
     void keyPressEvent(QKeyEvent *event) override;
@@ -38,11 +43,16 @@ private slots:
     void play_pause_toggled(bool state);
     void auto_launch_toggled(bool state);
     void save_output_action_toggled(bool state);
-    void quit_action_triggered();
     void update_taskslist();
     void tab_bar_custom_context_menu_requested(const QPoint &pos);
+    void tray_icon_activated(QSystemTrayIcon::ActivationReason reason);
+    void tray_show_toggled(bool state);
+    void tray_message_clicked();
+    void quit();
 
 private:
+    void create_tray_icon();
+
     void save_settings();
     void restore_settings();
 
@@ -61,6 +71,10 @@ private:
     QAction *m_choose_path_to_taskslist_action = nullptr;
     QAction *m_play_pause_action = nullptr;
     QAction *m_quit_action = nullptr;
+
+    QSystemTrayIcon *m_tray_icon = nullptr;
+    QAction *m_minimize_action = nullptr;
+    QAction *m_restore_action = nullptr;
 
 signals:
     void start();

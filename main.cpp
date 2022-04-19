@@ -15,7 +15,6 @@ void signal_handler(int sig)
     switch (sig)
     {
     case SIGINT:
-    case SIGTERM:
     case SIGTSTP:
         std::cout << "finish (" << sig << ")" << std::endl;
         Application::quit();
@@ -34,8 +33,6 @@ int main(int argc, char *argv[])
 #ifndef _WIN32
     if (std::signal(SIGINT, signal_handler) == SIG_ERR)
         std::cerr << "Can not set signal handler for SIGINT!" << std::endl;
-    if (std::signal(SIGTERM, signal_handler) == SIG_ERR)
-        std::cerr << "Can not set signal handler for SIGTERM!" << std::endl;
     if (std::signal(SIGTSTP, signal_handler) == SIG_ERR)
         std::cerr << "Can not set signal handler for SIGTSTP!" << std::endl;
     if (std::signal(SIGSEGV, signal_handler) == SIG_ERR)

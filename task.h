@@ -33,7 +33,7 @@ public:
     friend bool operator!=(const Task &p1, const Task &p2)
     {
         return !(p1 == p2);
-    };
+    }
 
 #ifndef QT_NO_DEBUG_STREAM
 friend QDebug operator<<(QDebug debug, const Task &p)

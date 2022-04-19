@@ -54,8 +54,8 @@ void Task::start()
     m_process->setWorkingDirectory(info.pwd);
     m_process->setArguments(args);
     m_process->setProgram(info.exe);
-    m_process->start();
 
+    m_process->start();
     if (!m_process->waitForStarted(1000))
     {
 #if QT_VERSION < QT_VERSION_CHECK(5, 6, 0)
@@ -145,6 +145,7 @@ Task *Task::from_json_array_object_ordered(const jsoncons::ojson &array_value)
     try
     {
         std::unique_ptr<Task> ptr(new Task);
+        ptr->info.name = array_value["name"].as_string_view().data();
         ptr->info.exe = array_value["exe"].as_string_view().data();
         ptr->info.args = array_value["args"].as_string_view().data();
         ptr->info.pwd = array_value["pwd"].as_string_view().data();
@@ -171,7 +172,7 @@ jsoncons::ojson Task::to_json_array_object_ordered() const
 
 QString Task::name() const noexcept
 {
-    return QFileInfo(info.exe).baseName();
+    return info.name;
 }
 
 qint64 Task::pid() const noexcept

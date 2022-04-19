@@ -1,19 +1,20 @@
 {
-	"tasks" :
-	[
-		{
-			"exe" : "ls",
-			"args" : "-a",
-			"pwd" : "",
-			"timeout" : "1000",
-			"extra_args" : false
-		},
-		{
-			"exe" : "uname",
-			"args" : "-r",
-			"pwd" : "",
-			"timeout" : "1000",
-			"extra_args" : true
-		}
-	]
+    "tasks": [
+        {
+            "name": "uname", 
+            "exe": "/bin/uname", 
+            "args": "-r", 
+            "pwd": "", 
+            "timeout": 1000, 
+            "extra_args": false
+        }, 
+        {
+            "name": "ls", 
+            "exe": "/bin/ls", 
+            "args": "-a", 
+            "pwd": "", 
+            "timeout": 1000, 
+            "extra_args": true
+        }
+    ]
 }

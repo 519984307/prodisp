@@ -23,9 +23,9 @@ bool prodisp::streq(const char *s1, const char *s2)
     return (strcasecmp(s1, s2) == 0);
 }
 
-bool prodisp::confirm_operation(const QString &title, const QString &text) noexcept
+bool prodisp::confirm_operation(const QString &title, const QString &text, QWidget *parent) noexcept
 {
-    QMessageBox mbox;
+    QMessageBox mbox(parent);
     mbox.setWindowTitle(title);
     mbox.setText(text);
     mbox.setIcon(QMessageBox::Question);

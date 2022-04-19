@@ -14,6 +14,11 @@ public:
     TaskExecutor(const QStringList &extra_args = QStringList(), QObject *parent = nullptr);
     ~TaskExecutor();
 
+    TaskExecutor(const TaskExecutor&) = delete;
+    TaskExecutor(TaskExecutor&&) = delete;
+    TaskExecutor &operator=(const TaskExecutor&) = delete;
+    TaskExecutor &operator=(TaskExecutor&&) = delete;
+
     static QStringList extra_args() noexcept;
     static QString taskslist_name() noexcept;
     static QString taskslist_path() noexcept;

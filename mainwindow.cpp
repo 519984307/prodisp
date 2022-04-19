@@ -82,10 +82,11 @@ MainWindow::MainWindow(QWidget *parent)
     QObject::connect(m_choose_path_to_taskslist_action, &QAction::triggered, this, &MainWindow::choose_path_to_taskslist_action_triggered);
     QObject::connect(ui->save_output_action, &QAction::toggled, this, &MainWindow::save_output_action_toggled);
     QObject::connect(m_play_pause_action, &QAction::toggled, this, &MainWindow::play_pause_toggled);
-    QObject::connect(m_quit_action, &QAction::triggered, this, &MainWindow::quit_action_triggered);
+    QObject::connect(m_quit_action, &QAction::triggered, this, &MainWindow::quit);
     QObject::connect(ui->autolaunch_action, &QAction::toggled, this, &MainWindow::auto_launch_toggled);
     QObject::connect(ui->reread_taskslist_action, &QAction::triggered, this, &MainWindow::ask_to_restart);
 
+    create_tray_icon();
     QTimer::singleShot(0, this, &MainWindow::restore_settings);
 }
 
@@ -93,6 +94,17 @@ MainWindow::~MainWindow()
 {
     save_settings();
     delete ui;
+}
+
+void MainWindow::setVisible(bool visible)
+{
+    if (m_tray_icon != nullptr)
+    {
+        m_minimize_action->setEnabled(visible);
+        m_restore_action->setEnabled(!visible);
+    }
+
+    QMainWindow::setVisible(visible);
 }
 
 void MainWindow::keyPressEvent(QKeyEvent *event)
@@ -109,8 +121,28 @@ void MainWindow::keyPressEvent(QKeyEvent *event)
 
 void MainWindow::closeEvent(QCloseEvent *event)
 {
-    save_settings();
-    QMainWindow::closeEvent(event);
+#ifdef Q_OS_OSX
+    if (!event->spontaneous() || !isVisible())
+    {
+        return;
+    }
+#endif
+    if (m_tray_icon != nullptr)
+    {
+        if (m_tray_icon->isVisible())
+        {
+            hide();
+            event->ignore();
+        }
+        else
+        {
+            quit();
+        }
+    }
+    else
+    {
+        quit();
+    }
 }
 
 void MainWindow::task_started(const QString &task_name)
@@ -141,6 +173,15 @@ void MainWindow::task_finished(const QString &task_name, int exit_code)
             }
 
             m_tabs->setTabIcon(i, QIcon(":/images/red.png"));
+
+            // Popup
+            if (m_tray_icon != nullptr && exit_code != 0)
+            {
+                if (m_tray_icon->isVisible() && !isVisible())
+                {
+                    m_tray_icon->showMessage(task_name, tr("Процесс аварийно завершился"), QSystemTrayIcon::Warning, 3000);
+                }
+            }
         }
     }
 }
@@ -264,12 +305,6 @@ void MainWindow::save_output_action_toggled(bool state)
     sett.setValue("save_output", state);
 }
 
-void MainWindow::quit_action_triggered()
-{
-    save_settings();
-    Application::quit();
-}
-
 void MainWindow::update_taskslist()
 {
     emit restart(false);
@@ -286,8 +321,9 @@ void MainWindow::tab_bar_custom_context_menu_requested(const QPoint &pos)
 
     QMenu menu(this);
 #ifdef _WIN32
-    QAction *kill = menu.addAction(tr("Завершить принудительно (TerminateProcess)"));
-    if (menu.exec(m_tabs->tabBar()->mapToGlobal(pos)) != nullptr)
+    QAction *kill_action = menu.addAction(tr("Завершить принудительно (TerminateProcess)"));
+    QAction *a = menu.exec(m_tabs->tabBar()->mapToGlobal(pos));
+    if (a == kill_action)
         emit send_signal(task_name, 1);
 #else
     QMenu *send_signal_menu = menu.addMenu(tr("Отправить сигнал"));
@@ -307,6 +343,82 @@ void MainWindow::tab_bar_custom_context_menu_requested(const QPoint &pos)
     else if (a == sigalrm)
         emit send_signal(task_name, SIGALRM);
 #endif
+}
+
+void MainWindow::tray_icon_activated(QSystemTrayIcon::ActivationReason reason)
+{
+    switch (reason)
+    {
+    case QSystemTrayIcon::Trigger:
+        break;
+    case QSystemTrayIcon::DoubleClick:
+        if (!isVisible())
+        {
+            showNormal();
+        }
+        break;
+    case QSystemTrayIcon::MiddleClick:
+        break;
+    default:
+        ;
+    }
+}
+
+void MainWindow::tray_show_toggled(bool state)
+{
+    if (!m_tray_icon)
+        return;
+
+    QSettings sett;
+    sett.setValue("tray", state);
+
+    m_tray_icon->setVisible(state);
+}
+
+void MainWindow::tray_message_clicked()
+{
+    if (!isVisible())
+        showNormal();
+}
+
+void MainWindow::quit()
+{
+    save_settings();
+    Application::quit();
+}
+
+void MainWindow::create_tray_icon()
+{
+    QSettings sett;
+    if (!QSystemTrayIcon::isSystemTrayAvailable())
+    {
+        sett.setValue("tray", false);
+        ui->tray_show->setEnabled(false);
+        ui->tray_show->setChecked(false);
+
+        std::cerr << "system tray is not available" << std::endl;
+        return;
+    }
+
+    ui->tray_show->setChecked(sett.value("tray", false).toBool());
+
+    QMenu *menu = new QMenu(this);
+    m_minimize_action = menu->addAction(tr("Свернуть"));
+    m_restore_action = menu->addAction(tr("Развернуть"));
+    menu->addSeparator();
+    menu->addAction(m_quit_action);
+
+    QObject::connect(m_minimize_action, &QAction::triggered, this, &QMainWindow::hide);
+    QObject::connect(m_restore_action, &QAction::triggered, this, &QMainWindow::showNormal);
+
+    m_tray_icon = new QSystemTrayIcon(QIcon(":/images/process.png"), this);
+    m_tray_icon->setToolTip(windowTitle());
+    QObject::connect(ui->tray_show, &QAction::triggered, this, &MainWindow::tray_show_toggled);
+    QObject::connect(m_tray_icon, &QSystemTrayIcon::activated, this, &MainWindow::tray_icon_activated);
+    QObject::connect(m_tray_icon, &QSystemTrayIcon::messageClicked, this, &MainWindow::tray_message_clicked);
+
+    m_tray_icon->setContextMenu(menu);
+    m_tray_icon->setVisible(ui->tray_show->isChecked());
 }
 
 void MainWindow::choose_path_to_taskslist_action_triggered()
@@ -361,7 +473,7 @@ void MainWindow::restore_settings()
 
 void MainWindow::ask_to_restart()
 {
-    if (prodisp::confirm_operation(tr("Перезагрузка"), tr("Перечитать файл \"%1\"?").arg(TaskExecutor::taskslist_name())))
+    if (prodisp::confirm_operation(tr("Перезагрузка"), tr("Перечитать файл \"%1\"?").arg(TaskExecutor::taskslist_name()), this))
     {
         emit restart(m_play_pause_action->isChecked());
         emit ask_for_info();
@@ -403,7 +515,7 @@ void MainWindow::create_tabs(const QList<TaskInfo> &info)
         vl->addWidget(box);
         w->setLayout(vl);
 
-        m_tabs->addTab(w, QIcon(":/images/red.png"), i.name());
+        m_tabs->addTab(w, QIcon(":/images/red.png"), i.name);
     }
 }
 

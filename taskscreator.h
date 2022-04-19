@@ -3,6 +3,9 @@
 
 #include <QDialog>
 
+template<typename T>
+class QSet;
+
 class Task;
 class QLabel;
 class QLineEdit;
@@ -23,14 +26,15 @@ public slots:
 private slots:
     void add_task_button_clicked();
     void remove_task_button_clicked();
+    void clone_task_button_clicked();
 
     void save_button_clicked();
     void cancel_button_clicked();
 
-    void choose_exe_file(QLineEdit *exe_edit, QLineEdit *pwd_edit);
+    void choose_exe_file(QLineEdit *exe_edit, QLineEdit *pwd_edit, QLineEdit *name_edit);
     void choose_pwd_dir(QLineEdit *pwd_edit, QLineEdit *exe_edit);
 
-    void exe_text_changed(const QString &text, int index);
+    void name_text_changed(const QString &text, int index);
 
 private:
     void create_ui();
@@ -40,11 +44,16 @@ private:
 
     QString create_json(const QList<TaskInfo> &tasks);
 
+    TaskInfo get_taskinfo(int index);
+    bool check_taskinfo(const TaskInfo &info, const QSet<QString> &unique_names, QWidget *w);
+    void flash_edit(QWidget *w, const QString &name);
+
     void save_settings();
     void restore_settings();
 
     QToolButton *m_add_task_button = nullptr;
     QToolButton *m_remove_task_button = nullptr;
+    QToolButton *m_clone_task_button = nullptr;
 
     QTabWidget *m_task_tabs = nullptr;
     QPushButton *m_save_button = nullptr;

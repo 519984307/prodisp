@@ -45,6 +45,8 @@
     <addaction name="autolaunch_action"/>
     <addaction name="save_output_action"/>
     <addaction name="separator"/>
+    <addaction name="tray_show"/>
+    <addaction name="separator"/>
     <addaction name="reread_taskslist_action"/>
    </widget>
    <addaction name="file_menu"/>
@@ -102,6 +104,20 @@
    </property>
    <property name="statusTip">
     <string>Обновление списка задач</string>
+   </property>
+  </action>
+  <action name="tray_show">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="checked">
+    <bool>false</bool>
+   </property>
+   <property name="text">
+    <string>Сворачивать в трей</string>
+   </property>
+   <property name="statusTip">
+    <string>Отображать значок программы в системном лотке</string>
    </property>
   </action>
  </widget>

@@ -17,5 +17,6 @@
         <file>images/green.png</file>
         <file>images/console.png</file>
         <file>images/info.png</file>
+        <file>images/clone.png</file>
     </qresource>
 </RCC>

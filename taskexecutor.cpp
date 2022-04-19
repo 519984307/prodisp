@@ -129,6 +129,8 @@ void TaskExecutor::send_signal(const QString &task_name, int sig)
                         {
                             std::cout << "TerminateProcess() success" << std::endl;
                         }
+
+                        CloseHandle(h);
                     }
                     else
                     {
